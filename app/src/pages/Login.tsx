@@ -310,7 +310,7 @@ const Login: React.FC = () => {
     e.preventDefault();
     console.log(formData, userBehaviorData);
     axios
-      .post("http://localhost:5000/verify", {
+      .post(`${process.env.REACT_APP_BACKEND_URL}/api/v1/test`, {
         formData,
         userBehaviorData,
       })

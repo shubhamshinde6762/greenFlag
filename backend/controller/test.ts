@@ -1,8 +1,11 @@
 import { Request, Response } from "express";
+import userBehavior from "../models/behavior";
 
-export const test = (req: Request, res: Response): void => {
+export const test = async (req: Request, res: Response) => {
   try {
-    console.log(req)
+    console.log(req.body.userBehaviorData);
+
+    await userBehavior.create(req.body.userBehaviorData);
 
     res.status(200).json({ message: "Request received successfully!" });
   } catch (error) {
