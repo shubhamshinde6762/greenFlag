@@ -1,0 +1,26 @@
+{
+  "_id": { "$oid": "66e7d1063f6749fa02f5f2ad" },
+  "timestamp": { "$date": { "$numberLong": "1726468358110" } },
+  "ip_address": "127.0.0.1",
+  "user_agent": "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36",
+  "browser_fingerprint": "f72010813c12ffeb26f740615534cbd9",
+  "time_on_page": { "$numberDouble": "2205.379" },
+  "idle_time": { "$numberDouble": "2784.365999999992" },
+  "mouse_metrics": {
+    "total_distance": { "$numberDouble": "925.6480649911676" },
+    "total_time": { "$numberDouble": "2204.6470000000004" },
+    "average_speed": { "$numberDouble": "0.41986225685616224" },
+    "max_speed": { "$numberDouble": "32.894017005827905" },
+    "acceleration": { "$numberDouble": "-0.39090133077221445" },
+    "entropy": { "$numberDouble": "4.767236357002077" }
+  },
+  "validation_results": {
+    "ip_valid": true,
+    "user_agent_valid": true,
+    "fingerprint_present": true,
+    "session_duration_valid": true,
+    "mouse_movement_valid": false
+  },
+  "model_features": [],
+  "notes": "Suspicious mouse movement."
+}

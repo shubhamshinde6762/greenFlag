@@ -96,3 +96,4 @@ class UserBehavior(Document):
     deviceOrientation = fields.EmbeddedDocumentField(DeviceOrientation)
     touchData = fields.ListField(fields.EmbeddedDocumentField(TouchData))
     dragDropData = fields.ListField(fields.EmbeddedDocumentField(DragDropData))
+    browserFingerprint = fields.StringField()  # Added browser fingerprint field

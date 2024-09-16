@@ -1,0 +1,39 @@
+/* Admin.css */
+
+body {
+    font-family: 'Poppins', sans-serif  !important;
+  }
+  
+
+/* Increase font size for table */
+.custom-table .ant-table-cell {
+    font-size: 16px; /* Adjust as needed */
+  }
+  
+  /* Styling for result cells */
+  .result-human {
+    border: 2px solid #00B087;
+    border-radius: 8px;
+    background-color:rgba(22, 192, 152, 0.38); /* Light green */
+    padding: 4px;
+    text-align: center;
+    width: 72px;
+    color: #008767;
+
+  }
+  
+  .result-bot {
+    border: 2px solid #DF0404;
+    border-radius: 8px;
+    background-color: #FFC5C5; /* Light red */
+    padding: 4px;
+    text-align: center;
+    width: 72px;
+    color:#DF0404;
+  }
+
+ /* Admin.css */
+.ant-table-thead > tr > th {
+    font-size: 18px !important; /* Adjust size as needed */
+  }
+  

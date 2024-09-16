@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
+import FingerprintJS from "@fingerprintjs/fingerprintjs";
 import axios from "axios";
 
 interface FormData {
@@ -38,6 +39,7 @@ interface UserBehaviorData {
     endY: number;
     timestamp: string;
   }[];
+  browserFingerprint: string;
 }
 
 const Login: React.FC = () => {
@@ -74,6 +76,7 @@ const Login: React.FC = () => {
     deviceOrientation: { alpha: 0, beta: 0, gamma: 0 },
     touchData: [],
     dragDropData: [],
+    browserFingerprint: "",
   });
 
   const startTime = useRef<Date>(new Date());
@@ -128,6 +131,17 @@ const Login: React.FC = () => {
         },
       }));
     };
+
+    const initFingerprint = async () => {
+      const fp = await FingerprintJS.load();
+      const result = await fp.get();
+      setUserBehaviorData((prevData) => ({
+        ...prevData,
+        browserFingerprint: result.visitorId,
+      }));
+    };
+    
+    initFingerprint();
 
     window.addEventListener("deviceorientation", handleDeviceOrientation);
 
