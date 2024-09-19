@@ -34,10 +34,6 @@ def check_user_agent(user_agent):
         return False
     return True
 
-from datetime import datetime
-from scipy.spatial.distance import euclidean
-import numpy as np
-
 def calculate_entropy(speeds):
     # Dummy implementation, replace with actual entropy calculation
     return np.mean(speeds) if speeds else 0
@@ -131,127 +127,163 @@ def analyze_keyboard_input(keystroke_data):
     }
 
     is_valid = entropy >= 1.0
-    return is_valid, metrics
+    return bool(is_valid), metrics
 
 
 @bp.route('/verify', methods=['POST'])
 def verify():
     try:
         data = request.json
+        if data is None:
+            return jsonify({"message": "No JSON data provided"}), 400
+
         user_behavior_data = data.get('userBehaviorData')
-        form_data = data.get('formData')
-
         verification_log = VerificationLog()
+        verification_log.is_bot = True
         validation_results = ValidationResults()
+        failed_checks = []
+        
 
+        # form_data = data.get('formData')
+        # if form_data is None:
+        #     verification_log.save()
+        #     return jsonify({"message": "No form data provided"}), 400
+
+
+        # IP Address check
         ip_address = request.remote_addr
         verification_log.ip_address = ip_address
-        validation_results.ip_valid = is_valid_ip(ip_address)
-        if not validation_results.ip_valid:
-            verification_log.validation_results = validation_results
-            verification_log.notes = "Invalid IP address."
-            verification_log.save()
-            return jsonify({"message": "Invalid IP address."}), 400
+        if ip_address is None or ip_address == '':
+            validation_results.ip_valid = False
+            failed_checks.append("Missing IP address")
+        else:
+            validation_results.ip_valid = is_valid_ip(ip_address)
+            if not validation_results.ip_valid:
+                failed_checks.append("Invalid IP address")
 
+        # User Agent check
         user_agent = request.headers.get('User-Agent')
         verification_log.user_agent = user_agent
-        validation_results.user_agent_valid = check_user_agent(user_agent)
-        if not validation_results.user_agent_valid:
-            verification_log.validation_results = validation_results
-            verification_log.notes = "Invalid User-Agent."
+        if user_agent is None or user_agent == '':
+            validation_results.user_agent_valid = False
+            failed_checks.append("Missing User-Agent")
+        else:
+            validation_results.user_agent_valid = check_user_agent(user_agent)
+            if not validation_results.user_agent_valid:
+                failed_checks.append("Invalid User-Agent")
+                
+                
+        if user_behavior_data is None:
+            verification_log.notes = f"Failed checks: {', '.join(failed_checks)}" + " No user behavior data provided"
             verification_log.save()
-            return jsonify({"message": "Invalid User-Agent."}), 400
+            return jsonify({"message": "No user behavior data provided"}), 400
 
-        # Geolocation checks can be uncommented and adjusted as necessary
-        # try:
-        #     geo_response = geoip_reader.city(ip_address)
-        #     verification_log.ip_latitude = geo_response.location.latitude
-        #     verification_log.ip_longitude = geo_response.location.longitude
-        #     verification_log.reported_latitude = user_behavior_data['geoLocation']['latitude']
-        #     verification_log.reported_longitude = user_behavior_data['geoLocation']['longitude']
-            
-        #     validation_results.geolocation_match = (
-        #         abs(verification_log.ip_latitude - verification_log.reported_latitude) <= 1 and
-        #         abs(verification_log.ip_longitude - verification_log.reported_longitude) <= 1
-        #     )
-        #     if not validation_results.geolocation_match:
-        #         verification_log.validation_results = validation_results
-        #         verification_log.notes = "Geolocation mismatch."
-        #         verification_log.save()
-        #         return jsonify({"message": "Geolocation mismatch."}), 400
-        # except Exception as e:
-        #     print(f"GeoIP error: {e}")
+        # Browser Fingerprint check
+        browser_fingerprint = user_behavior_data.get('browserFingerprint')
+        verification_log.browser_fingerprint = browser_fingerprint
+        if browser_fingerprint is None or browser_fingerprint == '':
+            validation_results.fingerprint_present = False
+            failed_checks.append("Missing browser fingerprint")
+        else:
+            validation_results.fingerprint_present = True
 
-        verification_log.browser_fingerprint = user_behavior_data.get('browserFingerprint')
-        validation_results.fingerprint_present = bool(verification_log.browser_fingerprint)
-        if not validation_results.fingerprint_present:
-            verification_log.validation_results = validation_results    
-            verification_log.notes = "Missing browser fingerprint."
-            verification_log.save()
-            return jsonify({"message": "Missing browser fingerprint."}), 400
+        # Session duration check
+        time_on_page = user_behavior_data.get('timeOnPage')
+        idle_time = user_behavior_data.get('idleTime')
+        if time_on_page is None or idle_time is None:
+            validation_results.session_duration_valid = False
+            failed_checks.append("Missing session duration data")
+        else:
+            verification_log.time_on_page = time_on_page
+            verification_log.idle_time = idle_time
+            validation_results.session_duration_valid = time_on_page >= 5
+            if not validation_results.session_duration_valid:
+                failed_checks.append("Suspiciously short session")
 
-        verification_log.time_on_page = user_behavior_data['timeOnPage']
-        verification_log.idle_time = user_behavior_data['idleTime']
-        validation_results.session_duration_valid = verification_log.time_on_page >= 5
-        if not validation_results.session_duration_valid:
-            verification_log.validation_results = validation_results
-            verification_log.notes = "Suspiciously short session."
-            verification_log.save()
-            return jsonify({"message": "Suspiciously short session."}), 400
+        # Mouse movement check
+        cursor_data = user_behavior_data.get('cursorData')
+        if cursor_data is None or len(cursor_data) == 0:
+            validation_results.mouse_movement_valid = False
+            failed_checks.append("Missing mouse movement data")
+        else:
+            validation_results.mouse_movement_valid, mouse_metrics = analyze_mouse_movement(cursor_data)
+            if mouse_metrics:
+                verification_log.mouse_metrics = MouseMetrics(
+                    total_distance=mouse_metrics.get('total_distance', 0),
+                    total_time=mouse_metrics.get('total_time', 0),
+                    average_speed=mouse_metrics.get('average_speed', 0),
+                    max_speed=mouse_metrics.get('max_speed', 0),
+                    acceleration=mouse_metrics.get('acceleration', 0),
+                    entropy=mouse_metrics.get('entropy', 0)
+                )
+            if not validation_results.mouse_movement_valid:
+                failed_checks.append("Suspicious mouse movement")
 
-        print(validation_results)
-        validation_results.mouse_movement_valid, verification_log.mouse_metrics = analyze_mouse_movement(user_behavior_data['cursorData'])
-        if not isinstance(validation_results.mouse_movement_valid, bool):
-            print("Error: mouse_movement_valid is not a boolean value.")
-        if not validation_results.mouse_movement_valid:
-            verification_log.validation_results = validation_results
-            verification_log.notes = "Suspicious mouse movement."
-            verification_log.save()
-            return jsonify({"message": "Suspicious mouse movement."}), 400
+        # Keyboard input check
+        keystroke_data = user_behavior_data.get('keystrokeData')
+        if keystroke_data is None or len(keystroke_data) == 0:
+            validation_results.keyboard_input_valid = False
+            failed_checks.append("Missing keyboard input data")
+        else:
+            validation_results.keyboard_input_valid, keyboard_metrics = analyze_keyboard_input(keystroke_data)
+            if keyboard_metrics:
+                verification_log.keyboard_metrics = KeyboardMetrics(
+                    total_keystrokes=keyboard_metrics.get('total_keystrokes', 0),
+                    average_interval=keyboard_metrics.get('average_interval', 0),
+                    entropy=keyboard_metrics.get('entropy', 0)
+                )
+            if not validation_results.keyboard_input_valid:
+                failed_checks.append("Suspicious keyboard input")
 
-        validation_results.keyboard_input_valid, verification_log.keyboard_metrics = analyze_keyboard_input(user_behavior_data['keystrokeData'])
-        if not isinstance(validation_results.keyboard_input_valid, bool):
-            print("Error: keyboard_input_valid is not a boolean value.")
-        if not validation_results.keyboard_input_valid:
-            verification_log.validation_results = validation_results
-            verification_log.notes = "Suspicious keyboard input."
-            verification_log.save()
-            return jsonify({"message": "Suspicious keyboard input."}), 400
+        # Device orientation check (for mobile devices)
+        device_info = user_behavior_data.get('deviceInfo')
+        if device_info is None:
+            validation_results.device_orientation_valid = False
+            failed_checks.append("Missing device info")
+        elif device_info.get('deviceType') == 'mobile':
+            orientation_data = user_behavior_data.get('deviceOrientation')
+            if orientation_data is None:
+                validation_results.device_orientation_valid = False
+                failed_checks.append("Missing device orientation data for mobile device")
+            else:
+                alpha = orientation_data.get('alpha')
+                beta = orientation_data.get('beta')
+                gamma = orientation_data.get('gamma')
+                if alpha is None or beta is None or gamma is None:
+                    validation_results.device_orientation_valid = False
+                    failed_checks.append("Incomplete device orientation data")
+                else:
+                    validation_results.device_orientation_valid = len(set([alpha, beta, gamma])) > 1
+                    if not validation_results.device_orientation_valid:
+                        failed_checks.append("Suspicious device orientation data")
+        else:
+            validation_results.device_orientation_valid = None  # Not applicable for non-mobile devices
 
-        if user_behavior_data['deviceInfo']['deviceType'] == 'mobile':
-            orientation_data = user_behavior_data['deviceOrientation']
-            validation_results.device_orientation_valid = len(set([orientation_data['alpha'], orientation_data['beta'], orientation_data['gamma']])) > 1
-            if not isinstance(validation_results.device_orientation_valid, bool):
-                print("Error: device_orientation_valid is not a boolean value.")
-            if not validation_results.device_orientation_valid:
-                verification_log.validation_results = validation_results
-                verification_log.notes = "Suspicious device orientation data."
-                verification_log.save()
-                return jsonify({"message": "Suspicious device orientation data."}), 400
-
+        # Prepare model features
         verification_log.model_features = [
-            len(user_behavior_data['cursorData']),
-            len(user_behavior_data['clickData']),
-            len(user_behavior_data['keystrokeData']),
-            verification_log.time_on_page,
-            verification_log.idle_time,
-            len(user_behavior_data['copyPasteData']),
-            user_behavior_data['zoomLevel'],
+            len(cursor_data) if cursor_data else 0,
+            len(user_behavior_data.get('clickData', [])),
+            len(keystroke_data) if keystroke_data else 0,
+            verification_log.time_on_page if hasattr(verification_log, 'time_on_page') else 0,
+            verification_log.idle_time if hasattr(verification_log, 'idle_time') else 0,
+            len(user_behavior_data.get('copyPasteData', [])),
+            user_behavior_data.get('zoomLevel', 0),
         ]
 
-        # Uncomment if using a model for bot detection
-        # verification_log.model_prediction = model.predict([verification_log.model_features])[0]
-        # verification_log.is_bot = verification_log.model_prediction == -1  # Isolation Forest returns -1 for anomalies
-        # if verification_log.is_bot:
-        #     verification_log.notes = "Behavior classified as bot-like by the machine learning model."
-        #     verification_log.save()
-        #     return jsonify({"message": "Behavior classified as bot-like."}), 400
+        if failed_checks:
+            verification_log.validation_results = validation_results
+            verification_log.notes = f"Failed checks: {', '.join(failed_checks)}"
+            verification_log.is_bot = True
+            verification_log.save()
+            return jsonify({"message": f"Verification failed: {verification_log.notes}"}), 400
 
+        # If all checks pass
         user_behavior = UserBehavior(**user_behavior_data)
         user_behavior.save()
 
         verification_log.user_behavior_id = user_behavior.id
         verification_log.validation_results = validation_results
+        verification_log.is_bot = False
         verification_log.save()
 
         response = requests.post('http://localhost:4000/api/v1/test', json=data)
@@ -264,14 +296,31 @@ def verify():
         verification_log.save()
         return jsonify({"message": "An error occurred while processing your request."}), 500
 
-
-
 @bp.route('/admin/verification-logs', methods=['GET'])
 def get_verification_logs():
     try:
-        # You might want to add pagination here
-        logs = VerificationLog.objects.order_by('-timestamp')
-        return jsonify([log.to_mongo().to_dict() for log in logs])
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 10))
+        print(page, limit)
+        
+        skip = (page - 1) * limit
+
+        logs = VerificationLog.objects.order_by('-timestamp').skip(skip).limit(limit)
+        total_logs = VerificationLog.objects.count()  
+
+        # Convert ObjectId to string for JSON serialization
+        response = {
+            "page": page,
+            "limit": limit,
+            "total_logs": total_logs,
+            "total_pages": (total_logs + limit - 1) // limit,
+            "logs": [
+                {**log.to_mongo().to_dict(), '_id': str(log.id)}  # Convert ObjectId to string
+                for log in logs
+            ]
+        }
+
+        return jsonify(response)
     except Exception as e:
         print("Error retrieving verification logs:", e)
         return jsonify({"message": "An error occurred while retrieving verification logs."}), 500
