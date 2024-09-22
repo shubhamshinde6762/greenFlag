@@ -1,4 +1,5 @@
 from flask import request, jsonify
+from bson import ObjectId
 from . import bp
 from models.UserBehavior import UserBehavior
 from models.VerificationLog import VerificationLog, MouseMetrics, KeyboardMetrics, ValidationResults
@@ -187,8 +188,8 @@ def verify():
         else:
             validation_results.fingerprint_present = True
 
-        # Session duration check
-        time_on_page = user_behavior_data.get('timeOnPage')
+        time_on_page = user_behavior_data.get('idleTime')
+        print(time_on_page)
         idle_time = user_behavior_data.get('idleTime')
         if time_on_page is None or idle_time is None:
             validation_results.session_duration_valid = False
@@ -209,12 +210,12 @@ def verify():
             validation_results.mouse_movement_valid, mouse_metrics = analyze_mouse_movement(cursor_data)
             if mouse_metrics:
                 verification_log.mouse_metrics = MouseMetrics(
-                    total_distance=mouse_metrics.get('total_distance', 0),
-                    total_time=mouse_metrics.get('total_time', 0),
-                    average_speed=mouse_metrics.get('average_speed', 0),
-                    max_speed=mouse_metrics.get('max_speed', 0),
-                    acceleration=mouse_metrics.get('acceleration', 0),
-                    entropy=mouse_metrics.get('entropy', 0)
+                    total_distance=mouse_metrics.total_distance,
+                    total_time=mouse_metrics.total_time,
+                    average_speed=mouse_metrics.average_speed,
+                    max_speed=mouse_metrics.max_speed,
+                    acceleration=mouse_metrics.acceleration,
+                    entropy=mouse_metrics.entropy
                 )
             if not validation_results.mouse_movement_valid:
                 failed_checks.append("Suspicious mouse movement")
@@ -286,8 +287,8 @@ def verify():
         verification_log.is_bot = False
         verification_log.save()
 
-        response = requests.post('http://localhost:4000/api/v1/test', json=data)
-
+        # response = requests.post('http://localhost:4000/api/v1/test', json=data)
+        return {}
         return jsonify(response.json())
 
     except Exception as e:
@@ -308,16 +309,19 @@ def get_verification_logs():
         logs = VerificationLog.objects.order_by('-timestamp').skip(skip).limit(limit)
         total_logs = VerificationLog.objects.count()  
 
-        # Convert ObjectId to string for JSON serialization
+        def serialize_log(log):
+            log_dict = log.to_mongo().to_dict()
+            for key, value in log_dict.items():
+                if isinstance(value, ObjectId):
+                    log_dict[key] = str(value)
+            return log_dict
+
         response = {
             "page": page,
             "limit": limit,
             "total_logs": total_logs,
             "total_pages": (total_logs + limit - 1) // limit,
-            "logs": [
-                {**log.to_mongo().to_dict(), '_id': str(log.id)}  # Convert ObjectId to string
-                for log in logs
-            ]
+            "logs": [serialize_log(log) for log in logs]
         }
 
         return jsonify(response)
