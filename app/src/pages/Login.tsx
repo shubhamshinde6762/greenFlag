@@ -5,7 +5,7 @@ import Lottie from "lottie-react";
 import successAnimation from "../animations/icons8-check.json";
 import { aadhar, loader, uidai, close, logo } from "../animations";
 import { ConeIcon, Eye, EyeOff, Loader2 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface FormData {
   aadharNumber: string;
@@ -52,24 +52,10 @@ const Login: React.FC = () => {
     otp: "",
   });
 
-  const [isButtonDisabled, setIsButtonDisabled] = useState(false);
-  const [internalState, setInternalState] = useState("pending");
   const [timeElapsed, setTimeElapsed] = useState(30);
   const [animationState, setAnimationState] = useState("verifying");
   const [showOTP, setShowOTP] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (internalState === "pending") {
-        setAnimationState("success");
-        setInternalState("success");
-      } else if (internalState === "failure") {
-        setAnimationState("failure");
-      }
-    }, 3000);
-
-    return () => clearTimeout(timer);
-  }, [internalState]);
+  const [showVerificationPopup, setShowVerificationPopup] = useState(false);
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -88,19 +74,12 @@ const Login: React.FC = () => {
   }, [showOTP, timeElapsed]);
 
   const handleResendOTP = () => {
-    setTimeElapsed(30); // Reset the timer to 30 seconds
-    // Here you would typically call an API to resend the OTP
+    setTimeElapsed(30);
   };
 
   const handleGetOTP = (e: React.FormEvent) => {
     e.preventDefault();
-    if (animationState === "verifying") {
-      setInternalState("failure");
-      setIsButtonDisabled(true);
-    } else if (animationState === "success") {
-      setShowOTP(true);
-      // Here you would typically call an API to send the OTP
-    }
+    setShowOTP(true);
   };
 
   const [userBehaviorData, setUserBehaviorData] = useState<UserBehaviorData>({
@@ -371,26 +350,39 @@ const Login: React.FC = () => {
 
   const handleOTPSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // const timeOnPage = (Date.now() - startTime.current) / 1000;
+
+    setShowVerificationPopup(true);
+    setAnimationState("verifying");
+
     setUserBehaviorData((data) => ({
       ...data,
-      timeOnPage  : data.idleTime,
+      timeOnPage: data.idleTime,
     }));
 
-    console.log(formData, userBehaviorData);
-    axios
-      .post(`${process.env.REACT_APP_BACKEND_URL}/verify`, {
-        formData,
-        userBehaviorData,
-      })
-      .then((response) => {
-        console.log("OTP verification successful", response.data);
-        // Handle successful login here
-      })
-      .catch((error) => {
-        console.error("Error during OTP verification", error);
-        // Handle error here
-      });
+    setTimeout(() => {
+      axios
+        .post(`${process.env.REACT_APP_BACKEND_URL}/verify`, {
+          formData,
+          userBehaviorData,
+        })
+        .then((response) => {
+          console.log("OTP verification successful", response.data);
+          setAnimationState("success");
+          setShowOTP(false);
+          // Handle successful login here
+        })
+        .catch((error) => {
+          console.error("Error during OTP verification", error);
+          setAnimationState("failure");
+          setShowOTP(false);
+          // Handle error here
+        })
+        .finally(() => {
+          setTimeout(() => {
+            setShowVerificationPopup(false);
+          }, 2000); // Keep the popup visible for 2 more seconds after verification
+        });
+    }, 3000);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -484,49 +476,6 @@ const Login: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center justify-center gap-2">
-                {animationState === "verifying" && (
-                  <motion.div
-                    className="animate-spin h-5 w-5 mr-3"
-                    animate={{ rotate: 360 }}
-                    transition={{ repeat: Infinity, duration: 1 }}
-                  >
-                    <Loader2 />
-                  </motion.div>
-                )}
-                {animationState === "success" && (
-                  <motion.div
-                    initial={{ scale: 0.5 }}
-                    animate={{ scale: 1 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <Lottie
-                      animationData={successAnimation}
-                      loop={false}
-                      style={{ width: 30, height: 30 }}
-                    />
-                  </motion.div>
-                )}
-                {animationState === "failure" && (
-                  <motion.img
-                    src={close}
-                    alt="Failure"
-                    className="h-5 w-5 mr-3"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.3 }}
-                  />
-                )}
-                <span className="text-md xs:text-sm">
-                  {animationState === "verifying" && "Verifying..."}
-                  {animationState === "success" && "Verified!"}
-                  {animationState === "failure" && "Verification failed"}
-                </span>
-              </div>
-              <img src={logo} alt="Logo" className="h-10   w-auto" />
-            </div>
-
             {showOTP && (
               <motion.div
                 initial={{ opacity: 0 }}
@@ -579,6 +528,68 @@ const Login: React.FC = () => {
           </form>
         </motion.div>
       </motion.div>
+
+      <AnimatePresence>
+        {showVerificationPopup && (
+          <motion.div
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="bg-white p-8 rounded-lg shadow-xl flex gap-6"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+            >
+              <div className="flex items-center justify-center gap-2">
+                {animationState === "verifying" && (
+                  <motion.div
+                    className="animate-spin h-10 w-10"
+                    animate={{ rotate: 360 }}
+                    transition={{ repeat: Infinity, duration: 1 }}
+                  >
+                    <Loader2 size={40} />
+                  </motion.div>
+                )}
+                {animationState === "success" && (
+                  <motion.div
+                    initial={{ scale: 0.5 }}
+                    animate={{ scale: 1 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <Lottie
+                      animationData={successAnimation}
+                      loop={false}
+                      style={{ width: 60, height: 60 }}
+                    />
+                  </motion.div>
+                )}
+
+                {animationState === "failure" && (
+                  <motion.img
+                    src={close}
+                    alt="Failure"
+                    className="h-8 w-8 mr-3"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.3 }}
+                  />
+                )}
+
+                <span className="text-xl font-semibold">
+                  {animationState === "verifying" && "Verifying..."}
+                  {animationState === "success" && "Verified!"}
+                  {animationState === "failure" && "Verification failed"}
+                </span>
+              </div>
+
+              <img src={logo} alt="Logo" className="h-10  w-auto" />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };
