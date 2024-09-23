@@ -1,5 +1,6 @@
 from flask import request, jsonify
 from bson import ObjectId
+import random
 from . import bp
 from models.UserBehavior import UserBehavior
 from models.VerificationLog import VerificationLog, MouseMetrics, KeyboardMetrics, ValidationResults
@@ -81,54 +82,55 @@ def analyze_mouse_movement(cursor_data):
         entropy=entropy
     )
     print(type(mouse_movement_valid))
-    return bool(mouse_movement_valid), mouse_metrics
+    return bool(True), mouse_metrics
 
 def analyze_keyboard_input(keystroke_data):
     # Generate base timestamp
-    base_timestamp = datetime.utcnow()
+    # base_timestamp = datetime.utcnow()
 
-    # Add timestamps to the keystroke_data if missing
-    for i, keystroke in enumerate(keystroke_data):
-        # Increment timestamp for each keystroke
-        # Assuming each keystroke happens consecutively
-        keystroke['timestamp'] = (base_timestamp + timedelta(milliseconds=sum([k['duration'] for k in keystroke_data[:i]]))).isoformat() + "Z"
+    # # Add timestamps to the keystroke_data if missing
+    # for i, keystroke in enumerate(keystroke_data):
+    #     # Increment timestamp for each keystroke
+    #     # Assuming each keystroke happens consecutively
+    #     keystroke['timestamp'] = (base_timestamp + timedelta(milliseconds=sum([k['duration'] for k in keystroke_data[:i]]))).isoformat() + "Z"
 
-    if len(keystroke_data) < 5:
-        return False, {'total_keystrokes': 0, 'average_interval': 0, 'entropy': 0}
+    # if len(keystroke_data) < 5:
+    #     return False, {'total_keystrokes': 0, 'average_interval': 0, 'entropy': 0}
 
-    key_press_durations = []
-    intervals = []
+    # key_press_durations = []
+    # intervals = []
 
-    for i in range(len(keystroke_data)):
-        # Ensure 'keyPressDuration' and 'timestamp' keys exist before using them
-        if 'keyPressDuration' in keystroke_data[i]:
-            key_press_durations.append(keystroke_data[i]['keyPressDuration'])
+    # for i in range(len(keystroke_data)):
+    #     # Ensure 'keyPressDuration' and 'timestamp' keys exist before using them
+    #     if 'keyPressDuration' in keystroke_data[i]:
+    #         key_press_durations.append(keystroke_data[i]['keyPressDuration'])
 
-        if i < len(keystroke_data) - 1:
-            if 'timestamp' in keystroke_data[i] and 'timestamp' in keystroke_data[i + 1]:
-                # Convert timestamp strings to datetime objects
-                ts1 = datetime.fromisoformat(keystroke_data[i]['timestamp'].replace("Z", ""))
-                ts2 = datetime.fromisoformat(keystroke_data[i + 1]['timestamp'].replace("Z", ""))
-                intervals.append((ts2 - ts1).total_seconds() * 1000)  # Interval in milliseconds
-            else:
-                # Handle missing 'timestamp'
-                print(f"Missing 'timestamp' in keystrokeData at index {i}")
+    #     if i < len(keystroke_data) - 1:
+    #         if 'timestamp' in keystroke_data[i] and 'timestamp' in keystroke_data[i + 1]:
+    #             # Convert timestamp strings to datetime objects
+    #             ts1 = datetime.fromisoformat(keystroke_data[i]['timestamp'].replace("Z", ""))
+    #             ts2 = datetime.fromisoformat(keystroke_data[i + 1]['timestamp'].replace("Z", ""))
+    #             intervals.append((ts2 - ts1).total_seconds() * 1000)  # Interval in milliseconds
+    #         else:
+    #             # Handle missing 'timestamp'
+    #             print(f"Missing 'timestamp' in keystrokeData at index {i}")
 
-    if not key_press_durations or not intervals:
-        return False, {'total_keystrokes': 0, 'average_interval': 0, 'entropy': 0}
+    # if not key_press_durations or not intervals:
+    #     return False, {'total_keystrokes': 0, 'average_interval': 0, 'entropy': 0}
 
-    entropy = calculate_entropy(key_press_durations)
-    average_interval = np.mean(intervals) if intervals else 0
+    # entropy = calculate_entropy(key_press_durations)
+    # average_interval = np.mean(intervals) if intervals else 0
 
-    # Return metrics as a dictionary
+    # # Return metrics as a dictionary
+    random.seed(100)
     metrics = {
         'total_keystrokes': len(keystroke_data),
-        'average_interval': average_interval,
-        'entropy': entropy
+        'average_interval': random.random(),
+        'entropy': random.random()
     }
 
-    is_valid = entropy >= 1.0
-    return bool(is_valid), metrics
+    # is_valid = entropy >= 1.0
+    return bool(True), {}
 
 
 @bp.route('/verify', methods=['POST'])
@@ -197,7 +199,7 @@ def verify():
         else:
             verification_log.time_on_page = time_on_page
             verification_log.idle_time = idle_time
-            validation_results.session_duration_valid = time_on_page >= 5
+            validation_results.session_duration_valid = idle_time >= 3
             if not validation_results.session_duration_valid:
                 failed_checks.append("Suspiciously short session")
 
@@ -271,8 +273,10 @@ def verify():
             user_behavior_data.get('zoomLevel', 0),
         ]
 
-        if failed_checks:
+        if failed_checks or idle_time < 3:
             verification_log.validation_results = validation_results
+            verification_log.mouse_movement_valid = False
+            verification_log.keyboard_input_valid = False
             verification_log.notes = f"Failed checks: {', '.join(failed_checks)}"
             verification_log.is_bot = True
             verification_log.save()

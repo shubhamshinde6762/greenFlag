@@ -55,7 +55,7 @@ const Login: React.FC = () => {
   const [isButtonDisabled, setIsButtonDisabled] = useState(false);
   const [internalState, setInternalState] = useState("pending");
   const [timeElapsed, setTimeElapsed] = useState(30);
-  const [animationState, setAnimationState] = useState("verifying");
+  const [animationState, setAnimationState] = useState("success");
   const [showOTP, setShowOTP] = useState(false);
 
   useEffect(() => {
@@ -66,10 +66,10 @@ const Login: React.FC = () => {
       } else if (internalState === "failure") {
         setAnimationState("failure");
       }
-    }, 3000);
+    }, 1000);
 
     return () => clearTimeout(timer);
-  }, [internalState]);
+  }, [1000]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -374,7 +374,7 @@ const Login: React.FC = () => {
     // const timeOnPage = (Date.now() - startTime.current) / 1000;
     setUserBehaviorData((data) => ({
       ...data,
-      timeOnPage  : data.idleTime,
+      timeOnPage: data.idleTime,
     }));
 
     console.log(formData, userBehaviorData);
@@ -463,10 +463,7 @@ const Login: React.FC = () => {
               Secure access to your Aadhar account
             </p>
           </div>
-          <form
-            className="space-y-2"
-            onSubmit={showOTP ? handleOTPSubmit : handleGetOTP}
-          >
+          <form className="space-y-2">
             <div className="rounded-md shadow-sm -space-y-px">
               <div>
                 <motion.input
@@ -565,6 +562,7 @@ const Login: React.FC = () => {
 
             <motion.div whileTap={{ scale: 0.95 }}>
               <button
+                onClick={showOTP ? handleOTPSubmit : handleGetOTP}
                 type="submit"
                 className={`group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white ${
                   animationState === "failure"

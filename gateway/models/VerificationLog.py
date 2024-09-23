@@ -30,31 +30,24 @@ class VerificationLog(Document):
     user_agent = fields.StringField()
     browser_fingerprint = fields.StringField()
     
-    # Geolocation data
     reported_latitude = fields.FloatField()
     reported_longitude = fields.FloatField()
     ip_latitude = fields.FloatField()
     ip_longitude = fields.FloatField()
     
-    # Session data
     time_on_page = fields.FloatField()
     idle_time = fields.FloatField()
     
-    # Metrics
     mouse_metrics = fields.EmbeddedDocumentField(MouseMetrics)
     keyboard_metrics = fields.EmbeddedDocumentField(KeyboardMetrics)
     
-    # Validation results
     validation_results = fields.EmbeddedDocumentField(ValidationResults)
     
-    # Model prediction
     model_features = fields.ListField(fields.FloatField())
     model_prediction = fields.IntField()  # -1 for anomaly, 1 for normal
     
-    # Final outcome
     is_bot = fields.BooleanField()
     
-    # Additional data
     user_behavior_id = fields.ReferenceField('UserBehavior')
     notes = fields.StringField()
 
