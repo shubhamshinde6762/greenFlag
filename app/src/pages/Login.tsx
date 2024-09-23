@@ -6,6 +6,7 @@ import successAnimation from "../animations/icons8-check.json";
 import { aadhar, loader, uidai, close, logo } from "../animations";
 import { ConeIcon, Eye, EyeOff, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import ReCAPTCHA from "react-google-recaptcha";
 
 interface FormData {
   aadharNumber: string;
@@ -56,6 +57,8 @@ const Login: React.FC = () => {
   const [animationState, setAnimationState] = useState("verifying");
   const [showOTP, setShowOTP] = useState(false);
   const [showVerificationPopup, setShowVerificationPopup] = useState(false);
+  const [showRecaptcha, setShowRecaptcha] = useState(false);
+  const recaptchaRef = useRef<ReCAPTCHA>(null);
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -369,20 +372,36 @@ const Login: React.FC = () => {
           console.log("OTP verification successful", response.data);
           setAnimationState("success");
           setShowOTP(false);
-          // Handle successful login here
         })
         .catch((error) => {
           console.error("Error during OTP verification", error);
           setAnimationState("failure");
           setShowOTP(false);
-          // Handle error here
-        })
-        .finally(() => {
-          setTimeout(() => {
-            setShowVerificationPopup(false);
-          }, 2000); // Keep the popup visible for 2 more seconds after verification
+          setShowRecaptcha(true);
         });
     }, 3000);
+  };
+
+  const handleRecaptchaChange = (value: string | null) => {
+    if (value) {
+      // Verify the reCAPTCHA response
+      axios
+        .post(`${process.env.REACT_APP_BACKEND_URL}/verify-recaptcha`, {
+          recaptchaResponse: value,
+        })
+        .then((response) => {
+          console.log("reCAPTCHA verification successful", response.data);
+          setShowRecaptcha(false);
+          setShowVerificationPopup(false);
+          setShowOTP(true);
+        })
+        .catch((error) => {
+          console.error("Error during reCAPTCHA verification", error);
+          if (recaptchaRef.current) {
+            recaptchaRef.current.reset();
+          }
+        });
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -532,18 +551,18 @@ const Login: React.FC = () => {
       <AnimatePresence>
         {showVerificationPopup && (
           <motion.div
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+            className="fixed inset-0 bg-black bg-opacity-60 flex flex-col gap-4 items-center justify-center z-50"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
             <motion.div
-              className="bg-white p-8 rounded-lg shadow-xl flex gap-6"
+              className="bg-white flex  p-4 rounded-lg shadow-xl  items-center gap-20"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
             >
-              <div className="flex items-center justify-center gap-2">
+              <div className="flex items-center transition-all duration-300 justify-center gap-2">
                 {animationState === "verifying" && (
                   <motion.div
                     className="animate-spin h-10 w-10"
@@ -562,11 +581,10 @@ const Login: React.FC = () => {
                     <Lottie
                       animationData={successAnimation}
                       loop={false}
-                      style={{ width: 60, height: 60 }}
+                      style={{ width: 40, height: 60 }}
                     />
                   </motion.div>
                 )}
-
                 {animationState === "failure" && (
                   <motion.img
                     src={close}
@@ -577,7 +595,6 @@ const Login: React.FC = () => {
                     transition={{ duration: 0.3 }}
                   />
                 )}
-
                 <span className="text-xl font-semibold">
                   {animationState === "verifying" && "Verifying..."}
                   {animationState === "success" && "Verified!"}
@@ -585,8 +602,23 @@ const Login: React.FC = () => {
                 </span>
               </div>
 
-              <img src={logo} alt="Logo" className="h-10  w-auto" />
+              <img src={logo} alt="Logo" className="h-10 w-auto" />
             </motion.div>
+
+            {showRecaptcha && animationState === "failure" && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="flex flex-col items-center gap-4 p-2 bg-white rounded-lg"
+              >
+                <ReCAPTCHA
+                  ref={recaptchaRef}
+                  sitekey={process.env.REACT_APP_RECAPTCHA_SITE_KEY || ""}
+                  onChange={handleRecaptchaChange}
+                />
+              </motion.div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
